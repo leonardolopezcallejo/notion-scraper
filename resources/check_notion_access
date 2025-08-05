@@ -1,0 +1,76 @@
+import os
+import argparse
+from dotenv import load_dotenv
+from notion_client import Client
+from notion_client.errors import APIResponseError
+
+load_dotenv()
+
+def normalize_id(raw_id: str) -> str:
+    """Acepta IDs con o sin guiones y los normaliza a 32+4+4+4+12."""
+    rid = raw_id.replace("-", "")
+    if len(rid) != 32:
+        return raw_id  # lo devolvemos tal cual; Notion lo validará
+    return f"{rid[0:8]}-{rid[8:12]}-{rid[12:16]}-{rid[16:20]}-{rid[20:32]}"
+
+def extract_title_from_page(page: dict) -> str:
+    """Intenta extraer el título de una página Notion."""
+    props = page.get("properties", {})
+    for _, prop in props.items():
+        if prop.get("type") == "title":
+            return "".join([t["plain_text"] for t in prop.get("title", [])]).strip() or "(sin título)"
+    return "(sin título)"
+
+def check_access(notion: Client, block_id: str) -> None:
+    # 1) Intentamos como página
+    try:
+        page = notion.pages.retrieve(block_id)
+        title = extract_title_from_page(page)
+        print(f"✅ Acceso OK (página)\n• ID: {block_id}\n• Título: {title}")
+        return
+    except APIResponseError as e:
+        if e.code not in ("object_not_found", "validation_error"):
+            # Por ejemplo unauthorized, rate_limited, etc.
+            print(f"❌ Error accediendo como página: {e.code} - {getattr(e, 'message', '')}")
+        # Si es object_not_found/validation_error seguimos probando database
+
+    # 2) Intentamos como base de datos
+    try:
+        db = notion.databases.retrieve(block_id)
+        title = "".join([t["plain_text"] for t in db.get("title", [])]).strip() or "(sin título)"
+        print(f"✅ Acceso OK (base de datos)\n• ID: {block_id}\n• Título: {title}")
+        return
+    except APIResponseError as e:
+        msg = getattr(e, "message", "")
+        if e.code == "object_not_found":
+            print(
+                "❌ No se encontró el bloque o no está compartido con tu integración.\n"
+                "   → Abre la página/base de datos en Notion > Share > Invita a tu integración.\n"
+                f"   Detalle: {msg}"
+            )
+        elif e.code in ("unauthorized", "restricted_resource"):
+            print(
+                "🔒 Token inválido o sin permisos.\n"
+                "   → Revisa NOTION_TOKEN en tu .env y que la página esté compartida con la integración."
+            )
+        else:
+            print(f"❌ Error: {e.code} - {msg}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Comprueba el acceso de tu integración de Notion a un page_id/database_id.")
+    parser.add_argument("id", help="ID de página o base de datos de Notion (con o sin guiones)")
+    args = parser.parse_args()
+
+    notion_token = os.getenv("NOTION_TOKEN")
+    if not notion_token:
+        print("❌ NOTION_TOKEN no encontrado. Define NOTION_TOKEN en tu .env o en variables de entorno.")
+        return
+
+    block_id = normalize_id(args.id)
+    notion = Client(auth=notion_token)
+
+    print(f"🔎 Comprobando acceso al ID: {block_id}")
+    check_access(notion, block_id)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Asistente IA sobre Notion by Garaje</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f9f9f9;
+    }
+
+    h1 {
+      text-align: center;
+      background-color: #1a73e8;
+      color: white;
+      margin: 0;
+      padding: 15px;
+    }
+
+    #conversacion {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 16px;
+      background-color: #fff;
+      height: 400px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .user {
+      color: #1a73e8;
+      font-weight: bold;
+    }
+
+    .bot {
+      color: #d63384;
+      font-weight: bold;
+    }
+
+    #entrada {
+      width: 80%;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    #enviar {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #enviar:hover {
+      background-color: #155ab6;
+    }
+  </style>
+</head>
+<body>
+  <h1>Asistente IA sobre Notion de Garaje: G.book</h1>
+  <div id="conversacion"></div>
+
+  <input type="text" id="entrada" placeholder="Escribe tu pregunta aquí..." />
+  <button id="enviar">Enviar</button>
+
+  <script>
+    const entrada = document.getElementById("entrada");
+    const enviarBtn = document.getElementById("enviar");
+    const conversacion = document.getElementById("conversacion");
+
+    function scrollAbajo() {
+      conversacion.scrollTop = conversacion.scrollHeight;
+    }
+
+    function enviarPregunta() {
+      const pregunta = entrada.value.trim();
+      if (!pregunta) return;
+
+      conversacion.innerHTML += `<div><span class="user">🧑‍💻 Tú:</span> ${pregunta}</div>`;
+      entrada.value = "";
+      scrollAbajo();
+
+      fetch("http://127.0.0.1:8002/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: pregunta })
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log("Respuesta del servidor:", data);
+          conversacion.innerHTML += `<div><span class="bot">🤖 IA:</span> ${data.respuesta}</div>`;
+          scrollAbajo();
+        })
+        .catch(err => {
+          conversacion.innerHTML += `<div><span class="bot">🤖 IA:</span> Error: ${err}</div>`;
+          scrollAbajo();
+        });
+    }
+
+    enviarBtn.addEventListener("click", enviarPregunta);
+
+    entrada.addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        enviarPregunta();
+      }
+    });
+  </script>
+</body>
+</html>

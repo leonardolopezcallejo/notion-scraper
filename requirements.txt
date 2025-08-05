@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-dotenv
+notion-client
+openai
+azure-core
+azure-search-documents
