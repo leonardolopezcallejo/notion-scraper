@@ -5,60 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Asistente IA sobre Notion by Garaje</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background: #f9f9f9;
-    }
-
-    h1 {
-      text-align: center;
-      background-color: #1a73e8;
-      color: white;
-      margin: 0;
-      padding: 15px;
-    }
-
-    #conversacion {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 16px;
-      background-color: #fff;
-      height: 400px;
-      overflow-y: auto;
-      margin-bottom: 16px;
-    }
-
-    .user {
-      color: #1a73e8;
-      font-weight: bold;
-    }
-
-    .bot {
-      color: #d63384;
-      font-weight: bold;
-    }
-
-    #entrada {
-      width: 80%;
-      padding: 10px;
-      font-size: 16px;
-    }
-
-    #enviar {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-left: 10px;
-      background-color: #1a73e8;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    #enviar:hover {
-      background-color: #155ab6;
-    }
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+    h1 { text-align: center; background-color: #1a73e8; color: white; margin: 0; padding: 15px; }
+    #conversacion { border: 1px solid #ccc; border-radius: 6px; padding: 16px; background-color: #fff; height: 400px; overflow-y: auto; margin-bottom: 16px; }
+    .user { color: #1a73e8; font-weight: bold; }
+    .bot { color: #d63384; font-weight: bold; }
+    #entrada { width: 80%; padding: 10px; font-size: 16px; }
+    #enviar { padding: 10px 20px; font-size: 16px; margin-left: 10px; background-color: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    #enviar:hover { background-color: #155ab6; }
+    .fuente { font-size: 12px; color: #444; margin-left: 18px; }
   </style>
 </head>
 <body>
@@ -77,11 +32,24 @@
       conversacion.scrollTop = conversacion.scrollHeight;
     }
 
+    function renderFuentes(fuentes) {
+      if (!Array.isArray(fuentes) || fuentes.length === 0) return "";
+      let html = '<div class="fuente"><strong>Fuentes:</strong><ul>';
+      for (const f of fuentes) {
+        const t = f.title || "(sin título)";
+        const s = (f.snippet || "").replace(/\n/g, " ");
+        const idx = f.metadata && typeof f.metadata.index !== "undefined" ? f.metadata.index : "";
+        html += `<li><span>${t}</span> [chunk ${idx}] — <em>${s}</em></li>`;
+      }
+      html += "</ul></div>";
+      return html;
+    }
+
     function enviarPregunta() {
       const pregunta = entrada.value.trim();
       if (!pregunta) return;
 
-      conversacion.innerHTML += `<div><span class="user">🧑‍💻 Tú:</span> ${pregunta}</div>`;
+      conversacion.innerHTML += `<div><span class="user">Tú:</span> ${pregunta}</div>`;
       entrada.value = "";
       scrollAbajo();
 
@@ -90,20 +58,22 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: pregunta })
       })
-        .then(res => res.json())
-        .then(data => {
-          console.log("Respuesta del servidor:", data);
-          conversacion.innerHTML += `<div><span class="bot">🤖 IA:</span> ${data.respuesta}</div>`;
-          scrollAbajo();
-        })
-        .catch(err => {
-          conversacion.innerHTML += `<div><span class="bot">🤖 IA:</span> Error: ${err}</div>`;
-          scrollAbajo();
-        });
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(data => {
+        const fuentesHtml = renderFuentes(data.fuentes);
+        conversacion.innerHTML += `<div><span class="bot">IA:</span> ${data.respuesta}${fuentesHtml}</div>`;
+        scrollAbajo();
+      })
+      .catch(err => {
+        conversacion.innerHTML += `<div><span class="bot">IA:</span> Error: ${err.message}</div>`;
+        scrollAbajo();
+      });
     }
 
     enviarBtn.addEventListener("click", enviarPregunta);
-
     entrada.addEventListener("keypress", function (e) {
       if (e.key === "Enter") {
         e.preventDefault();

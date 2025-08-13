@@ -4,4 +4,5 @@ python-dotenv
 notion-client
 openai
 azure-core
-azure-search-documents
+azure-search-documents==11.6.0b2
+tiktoken
