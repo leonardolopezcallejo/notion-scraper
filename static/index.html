@@ -3,46 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Asistente IA sobre Notion by Garaje</title>
+  <title>Asistente IA sobre Notion de Garaje: G.book</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
-    h1 { text-align: center; background-color: #1a73e8; color: white; margin: 0; padding: 15px; }
-    #conversacion { border: 1px solid #ccc; border-radius: 6px; padding: 16px; background-color: #fff; height: 400px; overflow-y: auto; margin-bottom: 16px; }
-    .user { color: #1a73e8; font-weight: bold; }
-    .bot { color: #d63384; font-weight: bold; }
-    #entrada { width: 80%; padding: 10px; font-size: 16px; }
-    #enviar { padding: 10px 20px; font-size: 16px; margin-left: 10px; background-color: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    #enviar:hover { background-color: #155ab6; }
-    .fuente { font-size: 12px; color: #444; margin-left: 18px; }
+    :root { --fg:#0b0d12; --bg:#f7f9fc; --muted:#6b7280; --brand:#1a73e8; --bot:#d63384; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 24px; background: var(--bg); color: var(--fg); }
+    h1 { text-align: center; background: var(--brand); color: #fff; margin: 0 0 16px; padding: 16px; border-radius: 6px; }
+    #conversacion { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; height: 420px; overflow-y: auto; }
+    .user { color: var(--brand); font-weight: bold; }
+    .bot  { color: var(--bot); font-weight: bold; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    #entrada { flex: 1; padding: 12px; font-size: 16px; border: 1px solid #e5e7eb; border-radius: 6px; }
+    #enviar { padding: 12px 18px; font-size: 16px; background: var(--brand); color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    #enviar:hover { filter: brightness(0.95); }
   </style>
 </head>
 <body>
   <h1>Asistente IA sobre Notion de Garaje: G.book</h1>
+
   <div id="conversacion"></div>
 
-  <input type="text" id="entrada" placeholder="Escribe tu pregunta aquí..." />
-  <button id="enviar">Enviar</button>
+  <div class="row">
+    <input type="text" id="entrada" placeholder="Escribe tu pregunta aquí..." />
+    <button id="enviar">Enviar</button>
+  </div>
 
   <script>
+    const API_URL = "http://127.0.0.1:8002/chat";
+    const conversacion = document.getElementById("conversacion");
     const entrada = document.getElementById("entrada");
     const enviarBtn = document.getElementById("enviar");
-    const conversacion = document.getElementById("conversacion");
 
     function scrollAbajo() {
       conversacion.scrollTop = conversacion.scrollHeight;
-    }
-
-    function renderFuentes(fuentes) {
-      if (!Array.isArray(fuentes) || fuentes.length === 0) return "";
-      let html = '<div class="fuente"><strong>Fuentes:</strong><ul>';
-      for (const f of fuentes) {
-        const t = f.title || "(sin título)";
-        const s = (f.snippet || "").replace(/\n/g, " ");
-        const idx = f.metadata && typeof f.metadata.index !== "undefined" ? f.metadata.index : "";
-        html += `<li><span>${t}</span> [chunk ${idx}] — <em>${s}</em></li>`;
-      }
-      html += "</ul></div>";
-      return html;
     }
 
     function enviarPregunta() {
@@ -53,7 +46,7 @@
       entrada.value = "";
       scrollAbajo();
 
-      fetch("http://127.0.0.1:8002/chat", {
+      fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: pregunta })
@@ -63,8 +56,7 @@
         return res.json();
       })
       .then(data => {
-        const fuentesHtml = renderFuentes(data.fuentes);
-        conversacion.innerHTML += `<div><span class="bot">IA:</span> ${data.respuesta}${fuentesHtml}</div>`;
+        conversacion.innerHTML += `<div><span class="bot">IA:</span> ${data.respuesta}</div>`;
         scrollAbajo();
       })
       .catch(err => {

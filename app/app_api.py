@@ -1,6 +1,6 @@
-# app.py
+# app_api.py
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,28 +10,36 @@ from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from openai import AzureOpenAI
 
-# Load environment
+# Load environment variables
 load_dotenv()
 
-# Azure Search config
+# Azure Search configuration
 AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 AZURE_SEARCH_KEY = os.getenv("AZURE_SEARCH_KEY")
 AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX")
 
-# Azure OpenAI config
+# Azure OpenAI configuration
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT")
 AZURE_OPENAI_CHAT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-35-turbo")
 
-if not all([AZURE_SEARCH_ENDPOINT, AZURE_SEARCH_KEY, AZURE_SEARCH_INDEX,
-            AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT]):
+if not all(
+    [
+        AZURE_SEARCH_ENDPOINT,
+        AZURE_SEARCH_KEY,
+        AZURE_SEARCH_INDEX,
+        AZURE_OPENAI_ENDPOINT,
+        AZURE_OPENAI_KEY,
+        AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT,
+    ]
+):
     raise RuntimeError("Missing required environment variables")
 
 # FastAPI app
-app = FastAPI(title="RAG Notion Demo")
+app = FastAPI(title="RAG Notion API")
 
-# CORS to allow browser clients
+# CORS for browser clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -55,13 +63,12 @@ aoai_client = AzureOpenAI(
 # Request and response models
 class Pregunta(BaseModel):
     texto: str
-    top_k: int | None = 5
-    hybrid: bool | None = False
-    max_context_chars: int | None = 12000
+    top_k: Optional[int] = 5
+    hybrid: Optional[bool] = False
+    max_context_chars: Optional[int] = 12000
 
 class ChatRespuesta(BaseModel):
     respuesta: str
-    fuentes: List[Dict[str, Any]]
 
 def embed_query(text: str) -> List[float]:
     """Create an embedding for the query using the configured embeddings deployment."""
@@ -72,7 +79,7 @@ def embed_query(text: str) -> List[float]:
     return resp.data[0].embedding
 
 def vector_search(question: str, top_k: int, hybrid: bool) -> List[Dict[str, Any]]:
-    """Run vector or hybrid search on Azure Search and return hits."""
+    """Run vector or hybrid search on Azure AI Search and return hits."""
     q_vec = embed_query(question)
     vq = VectorizedQuery(vector=q_vec, k_nearest_neighbors=top_k, fields="contentVector")
 
@@ -80,19 +87,19 @@ def vector_search(question: str, top_k: int, hybrid: bool) -> List[Dict[str, Any
         results = search_client.search(
             search_text=question,
             vector_queries=[vq],
-            select=["id", "title", "content", "metadata"]
+            select=["id", "title", "content", "metadata"],
         )
     else:
         results = search_client.search(
             search_text=None,
             vector_queries=[vq],
-            select=["id", "title", "content", "metadata"]
+            select=["id", "title", "content", "metadata"],
         )
     return list(results)
 
 def build_context(hits: List[Dict[str, Any]], budget: int) -> str:
-    """Concatenate passages under a character budget."""
-    buf = []
+    """Concatenate passages under a character budget for the LLM prompt."""
+    buf: List[str] = []
     used = 0
     for h in hits:
         chunk = h.get("content") or ""
@@ -108,7 +115,7 @@ def build_context(hits: List[Dict[str, Any]], budget: int) -> str:
     return "\n\n".join(buf)
 
 def answer_with_rag(question: str, context: str) -> str:
-    """Call chat completion grounded on context."""
+    """Call chat completion grounded on provided context."""
     system = (
         "You are a helpful assistant. Answer using only the provided context. "
         "If the answer is not present, say you do not know. Be concise."
@@ -124,9 +131,14 @@ def answer_with_rag(question: str, context: str) -> str:
     )
     return resp.choices[0].message.content.strip()
 
+@app.get("/health")
+def health():
+    """Health endpoint to verify the service is up."""
+    return {"status": "ok"}
+
 @app.post("/chat", response_model=ChatRespuesta)
 def chat(pregunta: Pregunta):
-    """Main RAG endpoint. Returns answer and sources."""
+    """Main RAG endpoint. Returns only the final answer, no sources."""
     try:
         top_k = pregunta.top_k or 5
         hybrid = bool(pregunta.hybrid)
@@ -136,15 +148,6 @@ def chat(pregunta: Pregunta):
         context = build_context(hits, max_ctx)
         respuesta = answer_with_rag(pregunta.texto, context)
 
-        fuentes = []
-        for h in hits:
-            fuentes.append({
-                "id": h.get("id"),
-                "title": h.get("title") or "",
-                "snippet": (h.get("content") or "")[:300],
-                "metadata": h.get("metadata") or {}
-            })
-
-        return ChatRespuesta(respuesta=respuesta, fuentes=fuentes)
+        return ChatRespuesta(respuesta=respuesta)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
