@@ -16,10 +16,15 @@
     #entrada { flex: 1; padding: 12px; font-size: 16px; border: 1px solid #e5e7eb; border-radius: 6px; }
     #enviar { padding: 12px 18px; font-size: 16px; background: var(--brand); color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
     #enviar:hover { filter: brightness(0.95); }
+    .badge { font-size: 12px; color: #fff; background: #10b981; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+    .badge.off { background: #6b7280; }
   </style>
 </head>
 <body>
-  <h1>Asistente IA sobre Notion de Garaje: G.book</h1>
+  <h1>
+    Asistente IA sobre Notion de Garaje: G.book
+    <span id="mode-badge" class="badge">Demo</span>
+  </h1>
 
   <div id="conversacion"></div>
 
@@ -29,13 +34,49 @@
   </div>
 
   <script>
+    // Config
+    // Set FAKE to true to use mocked responses without backend
+    const FAKE = true;
+    const LATENCY_MS = 0; // Simulated latency for demo
     const API_URL = "http://127.0.0.1:8002/chat";
+
     const conversacion = document.getElementById("conversacion");
     const entrada = document.getElementById("entrada");
     const enviarBtn = document.getElementById("enviar");
+    const badge = document.getElementById("mode-badge");
+    badge.textContent = FAKE ? "Demo" : "Live";
+    badge.classList.toggle("off", !FAKE);
 
     function scrollAbajo() {
       conversacion.scrollTop = conversacion.scrollHeight;
+    }
+
+    // Simple mock engine for common queries
+    // Comments are in English and without symbols
+    function mockAnswer(q) {
+      const text = q.toLowerCase();
+
+      if (text.includes("cumple") || text.includes("birthday")) {
+        return "El día de tu cumpleaños lo tienes libre por defecto. Pídelo con antelación en la página de Vacaciones.";
+      }
+
+      if (text.includes("vacacion") && (text.includes("cuánt") || text.includes("numero") || text.includes("días"))) {
+        return "El número de días de vacaciones depende de la política vigente. Revisa la página de Vacaciones para el detalle.";
+      }
+
+      if (text.includes("vacacion") && (text.includes("página") || text.includes("información"))) {
+        return "En la página de Vacaciones encontrarás cómo solicitarlas, plazos mínimos, excepciones y procesos relacionados con producción.";
+      }
+
+      if (text.includes("onboard") || text.includes("bienvenida")) {
+        return "La guía de onboarding incluye checklist de acceso, herramientas, procesos y primeros pasos en Garaje de Ideas.";
+      }
+
+      if (text.includes("intranet") || text.includes("soporte")) {
+        return "Para accesos a la intranet o soporte, contacta al equipo correspondiente y revisa los procedimientos internos.";
+      }
+
+      return "No tengo esa información en el contexto de esta demo. Intenta ser más específico o consulta la página relacionada en G.book.";
     }
 
     function enviarPregunta() {
@@ -46,6 +87,17 @@
       entrada.value = "";
       scrollAbajo();
 
+      if (FAKE) {
+        // Simulated response without network
+        setTimeout(() => {
+          const data = { respuesta: mockAnswer(pregunta) };
+          conversacion.innerHTML += `<div><span class="bot">IA:</span> ${data.respuesta}</div>`;
+          scrollAbajo();
+        }, LATENCY_MS);
+        return;
+      }
+
+      // Real backend call when FAKE is false
       fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
