@@ -118,7 +118,7 @@ def answer_with_rag(question: str, context: str) -> str:
     """Call chat completion grounded on provided context."""
     system = (
         "You are a helpful assistant. Answer using only the provided context. "
-        "If the answer is not present, say you do not know. Be concise."
+        "If the answer is not present, say you do not know. Extend answers with examples if relevant."
     )
     user = f"Question:\n{question}\n\nContext:\n{context}"
     resp = aoai_client.chat.completions.create(
