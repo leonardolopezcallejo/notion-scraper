@@ -9,6 +9,14 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from openai import AzureOpenAI
+# NEW: specific exceptions
+from azure.core.exceptions import HttpResponseError
+from openai import BadRequestError
+from pathlib import Path
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 
 # Load environment variables
 load_dotenv()
@@ -38,6 +46,21 @@ if not all(
 
 # FastAPI app
 app = FastAPI(title="RAG Notion API")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+STATIC_DIR = PROJECT_ROOT / "static"
+
+if STATIC_DIR.exists():
+    # Serve /static/*  desde la carpeta raíz ./static
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # Servir index.html en la raíz
+    @app.get("/")
+    def root_index():
+        index = STATIC_DIR / "index.html"
+        if index.exists():
+            return FileResponse(str(index))
+        return {"status": "ok"}
 
 # CORS for browser clients
 app.add_middleware(
@@ -117,8 +140,8 @@ def build_context(hits: List[Dict[str, Any]], budget: int) -> str:
 def answer_with_rag(question: str, context: str) -> str:
     """Call chat completion grounded on provided context."""
     system = (
-        "You are a helpful assistant. Answer using only the provided context. "
-        "If the answer is not present, say you do not know. Extend answers with examples if relevant."
+       "Eres un asistentes experto en contenido. Usa ÚNICAMENTE el siguiente contexto para responder la pregunta."
+        "Si encuentras información relevante, empieza tu respuesta con Según el contexto... Extiende la respuesta con ejemplos si es relevante"
     )
     user = f"Question:\n{question}\n\nContext:\n{context}"
     resp = aoai_client.chat.completions.create(
@@ -149,5 +172,13 @@ def chat(pregunta: Pregunta):
         respuesta = answer_with_rag(pregunta.texto, context)
 
         return ChatRespuesta(respuesta=respuesta)
+
+    except BadRequestError as e:
+        # Typically wrong model or deployment name for embeddings/chat
+        raise HTTPException(status_code=400, detail=f"OpenAI BadRequest: {str(e)}")
+    except HttpResponseError as e:
+        # Azure Search errors like dimension mismatch or bad field
+        raise HTTPException(status_code=502, detail=f"Azure service error: {str(e)}")
     except Exception as e:
+        # Any other unhandled error
         raise HTTPException(status_code=500, detail=str(e))

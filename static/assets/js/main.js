@@ -2,9 +2,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Config
     // Set FAKE to true to use mocked responses without backend
-    const FAKE = true;
+    const FAKE = false;
     const LATENCY_MS = 300; // Simulated latency for demo
-    const API_URL = "http://127.0.0.1:8002/chat";
+    const API_URL = "/chat";
 
     const conversacion = document.getElementById("conversacion");
     const entrada = document.getElementById("entrada");
