@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  OWNER: your_github_user_or_org
+  OWNER: leonardolopezcallejo
   IMAGE: notion-rag
   TAG: latest
-  WEBAPP_NAME: your-appservice-name
+  WEBAPP_NAME: notion-rag
 
 jobs:
   build-push:
